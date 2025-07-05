@@ -1,0 +1,6 @@
+{
+  "token": "TU_TOKEN_DE_DISCORD",
+  "guildId": "ID_DE_TU_GUILD",
+  "clientId": "ID_DE_TU_CLIENTE",
+  "adminIds": ["ID_DEL_MOD1", "ID_DEL_ADMIN2"]
+}
