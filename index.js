@@ -1,94 +1,76 @@
-const { Client, GatewayIntentBits, Collection, Events, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const express = require('express');
+require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
-const config = require('./config.json');
+const { Client, GatewayIntentBits, Collection, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const client = new Client({
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
+});
+
 client.commands = new Collection();
 
+// Cargar comandos desde ./commands
 const commandsPath = path.join(__dirname, 'commands');
-const commandFiles = fs.readdirSync(commandsPath);
+const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
 for (const file of commandFiles) {
-  const command = require(`./commands/${file}`);
-  if (command && command.name && command.execute) {
+  const filePath = path.join(commandsPath, file);
+  const command = require(filePath);
+  if (command && command.name && typeof command.execute === 'function') {
     client.commands.set(command.name, command);
   } else {
     console.warn(`[WARN] El comando en ${file} está mal estructurado o incompleto.`);
   }
 }
 
-client.once(Events.ClientReady, () => {
-  console.log(`✅ Bot conectado como ${client.user.tag}`);
+const adminIds = process.env.ADMIN_IDS?.split(',') || [];
+
+client.on('ready', () => {
+  console.log(`✅ Bot N-FORCE iniciado como ${client.user.tag}`);
 });
 
-client.on(Events.InteractionCreate, async interaction => {
-  if (interaction.isCommand()) {
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isChatInputCommand() && !interaction.isButton()) return;
+
+  if (interaction.isChatInputCommand()) {
     const command = client.commands.get(interaction.commandName);
-    if (command) {
+    if (!command) return;
+    try {
       await command.execute(interaction);
+    } catch (error) {
+      console.error(error);
+      await interaction.reply({ content: '❌ An unexpected error occurred.', ephemeral: true });
     }
-  } else if (interaction.isButton()) {
-    const [action, userId] = interaction.customId.split('_');
-    if (action === 'ban') {
-      const isAdmin = config.adminIds.includes(interaction.user.id);
-      if (!isAdmin) return interaction.reply({ content: '⛔ No tienes permiso para usar este botón.', ephemeral: true });
+  }
 
-      // Actualiza mensaje original
-      await interaction.update({ components: [] });
+  if (interaction.isButton()) {
+    const [action, userId] = interaction.customId.split(':');
 
-      await interaction.followUp({
-        content: `✅ El usuario \`${userId}\` ha sido baneado por ${interaction.user.tag}.`,
-      });
+    if (action === 'banUser') {
+      if (!adminIds.includes(interaction.user.id)) {
+        return await interaction.reply({ content: '❌ You do not have permission to perform this action.', ephemeral: true });
+      }
 
-      // Aquí puedes también hacer el fetch al backend para aplicar el ban
+      const reason = 'Manual ban from Discord'; // Puedes mejorar esto luego con modal o inputs
+      try {
+        const res = await fetch(`${process.env.BACKEND_URL}/api/bans`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, reason })
+        });
+
+        if (res.ok) {
+          await interaction.reply({ content: `✅ User \`${userId}\` has been banned by <@${interaction.user.id}>.`, ephemeral: false });
+        } else {
+          const error = await res.json();
+          await interaction.reply({ content: `❌ Failed to ban user: ${error.message || 'Unknown error'}`, ephemeral: true });
+        }
+      } catch (err) {
+        console.error('Error banning user:', err);
+        await interaction.reply({ content: '❌ Internal server error during ban.', ephemeral: true });
+      }
     }
   }
 });
 
-client.login(config.token);
-const app = express();
-app.use(express.json());
-
-const PORT = process.env.PORT || 3000;
-
-app.post('/api/exploit-reports', async (req, res) => {
-  const report = req.body;
-  try {
-    const channel = await client.channels.fetch('ID_DEL_CANAL_DISCORD');
-
-    const embed = {
-      color: 0xff0000,
-      title: '🚨 Possible Exploiter Detected',
-      fields: [
-        { name: 'User', value: `\`${report.username} (${report.userId})\`` },
-        { name: 'Reason', value: report.reason || 'Unspecified exploit' },
-        { name: 'Device', value: report.deviceType || 'Unknown', inline: true },
-        { name: 'Location', value: report.location || 'Unavailable', inline: true },
-        { name: 'FPS / Ping', value: `FPS: ${report.fps || 'N/A'} / Ping: ${report.ping || 'N/A'}`, inline: true },
-        { name: 'Team', value: report.team || 'None', inline: true },
-        { name: 'Humanoid Stats', value: `WalkSpeed: ${report.walkSpeed}\nJumpPower: ${report.jumpPower}\nGravity: ${report.gravity}`, inline: true },
-      ],
-      timestamp: new Date(),
-    };
-
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`ban_${report.userId}`)
-        .setLabel('Ban User')
-        .setStyle(ButtonStyle.Danger)
-    );
-
-    await channel.send({ embeds: [embed], components: [row] });
-
-    res.status(200).json({ message: 'Reporte enviado correctamente al canal de Discord.' });
-  } catch (error) {
-    console.error('Error al enviar el reporte:', error);
-    res.status(500).json({ error: 'Internal error' });
-  }
-});
-
-app.listen(PORT, () => {
-  console.log(`🌐 Express server running on port ${PORT}`);
-});
+client.login(process.env.DISCORD_TOKEN);
