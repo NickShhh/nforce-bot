@@ -48,3 +48,47 @@ client.on(Events.InteractionCreate, async interaction => {
 });
 
 client.login(config.token);
+const app = express();
+app.use(express.json());
+
+const PORT = process.env.PORT || 3000;
+
+app.post('/api/exploit-reports', async (req, res) => {
+  const report = req.body;
+  try {
+    const channel = await client.channels.fetch('ID_DEL_CANAL_DISCORD');
+
+    const embed = {
+      color: 0xff0000,
+      title: '🚨 Possible Exploiter Detected',
+      fields: [
+        { name: 'User', value: `\`${report.username} (${report.userId})\`` },
+        { name: 'Reason', value: report.reason || 'Unspecified exploit' },
+        { name: 'Device', value: report.deviceType || 'Unknown', inline: true },
+        { name: 'Location', value: report.location || 'Unavailable', inline: true },
+        { name: 'FPS / Ping', value: `FPS: ${report.fps || 'N/A'} / Ping: ${report.ping || 'N/A'}`, inline: true },
+        { name: 'Team', value: report.team || 'None', inline: true },
+        { name: 'Humanoid Stats', value: `WalkSpeed: ${report.walkSpeed}\nJumpPower: ${report.jumpPower}\nGravity: ${report.gravity}`, inline: true },
+      ],
+      timestamp: new Date(),
+    };
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`ban_${report.userId}`)
+        .setLabel('Ban User')
+        .setStyle(ButtonStyle.Danger)
+    );
+
+    await channel.send({ embeds: [embed], components: [row] });
+
+    res.status(200).json({ message: 'Reporte enviado correctamente al canal de Discord.' });
+  } catch (error) {
+    console.error('Error al enviar el reporte:', error);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`🌐 Express server running on port ${PORT}`);
+});
