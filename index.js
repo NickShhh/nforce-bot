@@ -34,6 +34,22 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
+// Manejando el botón de ban
+    if (interaction.isButton()) {
+        if (interaction.customId.startsWith('banUser_')) {
+            const userId = interaction.customId.split('_')[1];
+            const isAdmin = adminIds.includes(interaction.user.id);
+
+            if (!isAdmin) {
+                return interaction.reply({ content: "❌ You don't have permission to use this button.", ephemeral: true });
+            }
+
+            // Aquí se hace el ban al usuario y se edita el mensaje anterior
+            // Ya tienes esta lógica implementada en el handler del botón
+        }
+    }
+});
+
 client.once('ready', () => {
     console.log(`✅ N-FORCE bot connected as ${client.user.tag}`);
 });
