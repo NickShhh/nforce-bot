@@ -1,14 +1,18 @@
 {
   "name": "nforce-bot",
   "version": "1.0.0",
+  "description": "N-FORCE Discord bot for anticheat moderation",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
+  "keywords": [],
+  "author": "Nick Dev",
+  "license": "MIT",
   "dependencies": {
     "discord.js": "^14.13.0",
-    "express": "^4.18.2",
-    "node-fetch": "^2.6.11"
+    "dotenv": "^16.3.1",
+    "node-fetch": "^3.3.2"
   },
   "engines": {
     "node": ">=18"
